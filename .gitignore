@@ -1,7 +1,10 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.venv/
 *.pt
 *.pth
 data/
 wandb/
+results/
+.venv/
