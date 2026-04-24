@@ -1,193 +1,347 @@
-<div align="center">
- 
-# DDIM with Classifier-Free Guidance on CIFAR-10
- 
-**COMP8221: Advanced Machine Learning — Assignment 1**
- 
-A from-scratch PyTorch implementation of [Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502) with [Classifier-Free Guidance](https://arxiv.org/abs/2207.12598) for class-conditional image generation on CIFAR-10.
- 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
- 
-</div>
- 
+<p align="center">
+  <img src="assets/macquarie-university-logo.png" alt="Macquarie University" width="260">
+</p>
+
+<h1 align="center">From-Scratch DDIM with Classifier-Free Guidance on CIFAR-10</h1>
+
+<p align="center">
+  <strong>COMP8221 — Advanced Machine Learning</strong><br>
+  <strong>Assignment 1 — Option 3: Diffusion Models</strong>
+</p>
+
+<p align="center">
+  A from-scratch PyTorch implementation of <strong>Denoising Diffusion Implicit Models (DDIM)</strong><br>
+  with <strong>Classifier-Free Guidance (CFG)</strong> for class-conditional image generation on <strong>CIFAR-10</strong>.
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue">
+  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-2.x-ee4c2c">
+  <img alt="Dataset" src="https://img.shields.io/badge/Dataset-CIFAR--10-brightgreen">
+  <img alt="Model" src="https://img.shields.io/badge/Model-DDIM%20%2B%20CFG-purple">
+</p>
+
 ---
- 
+
 ## Overview
- 
-Standard DDPM generates high-quality images but requires all 1000 reverse steps at inference — painfully slow. This project combines two improvements that solve that:
- 
-| Technique | What it does | Practical impact |
-|---|---|---|
-| **DDIM** ([Song et al., 2021](https://arxiv.org/abs/2010.02502)) | Non-Markovian reverse process that allows timestep-skipping | **50 steps ≈ 1000 steps** — ~16× wall-clock speedup |
-| **Classifier-Free Guidance** ([Ho & Salimans, 2021](https://arxiv.org/abs/2207.12598)) | Single model for conditional + unconditional generation via label dropout | Sharp, class-consistent samples without a separate classifier |
- 
-### Results at a Glance
- 
-| Metric | Value |
+
+This repository accompanies my COMP8221 Assignment 1 submission for **Option 3: Diffusion Models**. The project implements a **non-standard diffusion model** based on **DDIM** and extends it with **Classifier-Free Guidance (CFG)** for class-conditional image generation on CIFAR-10.
+
+I chose this combination for a practical reason:
+- **DDIM** reduces sampling cost by replacing the standard DDPM reverse chain with a **non-Markovian** update rule that supports timestep skipping.
+- **CFG** improves class fidelity and conditional control without requiring a separate classifier.
+
+Together, they form a technically meaningful diffusion variant that fits the assignment rubric well while remaining manageable to implement and analyse from scratch.
+
+---
+
+## Project Snapshot
+
+| Item | Details |
 |---|---|
-| **FID** | 13.72 |
-| **Inception Score** | 9.64 ± 0.30 |
-| **Training** | 400 epochs (~156k steps) on a single GPU |
-| **Sampling** | 50 DDIM steps, ~0.68 s for 10 images |
- 
-> **Note:** Published DDIM reports FID 4.67 on CIFAR-10 with 800k+ training steps. Our gap is expected given the compute budget — the assignment does not require state-of-the-art performance.
- 
+| **Student** | Alireza Yegane |
+| **Student ID** | 60957107 |
+| **Unit** | COMP8221 — Advanced Machine Learning |
+| **Assignment Option** | Option 3 — Diffusion Models |
+| **Model** | DDIM + Classifier-Free Guidance |
+| **Dataset** | CIFAR-10 (32×32 RGB, 10 classes) |
+| **Framework** | PyTorch |
+| **Main notebook** | `2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.ipynb` |
+| **Repository** | `github.com/AlirezaYegane/ddim-cfg-cifar10` |
+
 ---
- 
-## Architecture
- 
-A **67M-parameter U-Net** built entirely from scratch using standard `torch.nn` layers:
- 
-```
-Input (3×32×32)
-  ↓ Conv 3→128
-Encoder:    128 → 256 → 512 channels (ResBlocks + Self-Attention at 16×16, 8×8)
-Bottleneck: ResBlock → Attention → ResBlock at 512 ch, 8×8
-Decoder:    Mirror of encoder with skip connections
-  ↓ GroupNorm → SiLU → Conv 128→3
-Output (3×32×32) — predicted noise ε̂
-```
- 
-**Key components:**
-- **Sinusoidal time embeddings** → 2-layer MLP, injected via FiLM (scale-shift) in every ResBlock
-- **Learnable class embeddings** — 11 entries (10 CIFAR-10 classes + 1 null token for CFG)
-- **Multi-head self-attention** at 16×16 and 8×8 resolutions
-- **Cosine noise schedule** for uniform SNR progression across timesteps
-- **EMA** (decay 0.9999) of model weights for stable generation
- 
+
+## Results at a Glance
+
+| Metric | Value |
+|---|---:|
+| **FID** | **13.72** |
+| **Inception Score** | **9.64 ± 0.30** |
+| **Training length** | **400 epochs (~156k steps)** |
+| **Sampling setup** | **50 DDIM steps, η = 0.0, guidance scale = 3.0** |
+| **Runtime** | **~0.68 s for 10 images** |
+
+> These results are not intended to match large-scale published diffusion benchmarks. The focus of the project is on **correct implementation, clear analysis, and strong rubric alignment** rather than state-of-the-art performance.
+
 ---
- 
-## Project Structure
- 
-```
-ddim-cfg-cifar10/
-├── report.ipynb               # Full notebook — implementation, training, evaluation
+
+## Why This Project Fits Option 3
+
+This submission is intentionally built around **DDIM**, not a basic DDPM baseline.
+
+### What makes it a valid diffusion variant?
+- The **forward noising process** follows the standard diffusion setup used during training.
+- The **reverse process** is changed to DDIM's **non-Markovian sampler**, which allows fewer reverse steps.
+- The model is extended with **Classifier-Free Guidance**, so the same network supports both conditional and unconditional predictions.
+
+In other words, this is not a workshop baseline reproduced verbatim. It is a **from-scratch implementation of a diffusion variant** with a distinct sampling procedure and a meaningful conditional generation mechanism.
+
+---
+
+## Repository Structure
+
+```text
+.
+├── 2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.ipynb
 ├── README.md
-├── checkpoints/                # Saved model weights
+├── checkpoints/
 │   ├── best_model.pt
 │   ├── final_model.pt
 │   └── checkpoint_epoch*.pt
-├── data/                       # CIFAR-10 (auto-downloaded)
+├── data/
+│   └── CIFAR-10 (auto-downloaded)
 └── results/
     ├── loss_curves/
     ├── samples/
     ├── diffusion_process/
     └── fid/
-        ├── generated/           # 10k generated images
-        └── real/                # 10k real test images
+        ├── generated/
+        └── real/
 ```
- 
+
 ---
- 
-## Getting Started
- 
-### Requirements
- 
-```
-Hardware: NVIDIA GPU with ≥12 GB VRAM (trained on RTX 6000 Ada, 48 GB)
-OS:       Linux (tested on Ubuntu 22.04)
-Python:   3.10+
-```
- 
-### Installation
- 
+
+## Method Summary
+
+### 1) U-Net Noise Predictor
+The core model is a **from-scratch U-Net** that receives:
+- a noisy image `x_t`,
+- a timestep `t`,
+- and a class label `c`,
+
+and predicts the added noise `ε̂`.
+
+### 2) Time Conditioning
+Timesteps are encoded using **sinusoidal embeddings** followed by a small MLP, allowing the network to adapt to different noise levels across the diffusion trajectory.
+
+### 3) Class Conditioning for CFG
+The model uses a learnable class embedding table with **11 entries**:
+- 10 CIFAR-10 classes,
+- plus 1 **null token** for unconditional generation.
+
+During training, class labels are dropped with probability `p_uncond = 0.1`, so the same model learns both conditional and unconditional behaviour.
+
+### 4) FiLM-Based Conditioning
+Time and class information are fused and injected into residual blocks through **FiLM-style scale-shift modulation**, allowing the network to adapt feature processing based on both timestep and class.
+
+### 5) Self-Attention
+Self-attention is applied at **16×16** and **8×8** resolutions, where global context is useful and computational cost is still reasonable.
+
+### 6) DDIM Scheduler
+The project implements:
+- the closed-form **forward process** used during training,
+- and the **DDIM reverse process** used during accelerated sampling.
+
+Both **linear** and **cosine** schedules are implemented, with the **cosine schedule** used for the final model.
+
+---
+
+## Training Objective
+
+The model is trained with the standard **noise-prediction MSE objective** used in diffusion models:
+1. sample a clean image `x0`,
+2. sample a random timestep `t`,
+3. add Gaussian noise to obtain `x_t`,
+4. predict the noise with the U-Net,
+5. minimise the mean squared error between predicted noise and true noise.
+
+This objective is simple, stable, and directly compatible with DDIM sampling at inference time.
+
+---
+
+## Dataset and Preprocessing
+
+### Why CIFAR-10?
+I use **CIFAR-10** because it is:
+- a standard low-resolution benchmark for generative image modelling,
+- computationally realistic for a from-scratch course project,
+- and naturally suited to conditional generation because it provides 10 balanced semantic classes.
+
+### Preprocessing pipeline
+The data pipeline includes:
+- conversion to tensor,
+- scaling to the `[-1, 1]` range,
+- and horizontal flipping during training.
+
+This preprocessing is appropriate for diffusion training and is kept intentionally simple so the model behaviour remains interpretable.
+
+---
+
+## Training Configuration
+
+| Category | Parameter | Value |
+|---|---|---:|
+| **Model** | Base channels | 128 |
+|  | Channel multipliers | (1, 2, 4) |
+|  | Residual blocks per level | 2 |
+|  | Attention resolutions | 16, 8 |
+|  | Dropout | 0.1 |
+| **Diffusion** | Timesteps | 1000 |
+|  | Beta schedule | Cosine |
+| **CFG** | Unconditional dropout | 0.1 |
+|  | Guidance scale | 3.0 |
+| **Training** | Batch size | 128 |
+|  | Learning rate | 2e-4 |
+|  | Epochs | 400 |
+|  | EMA decay | 0.9999 |
+| **Sampling** | DDIM steps | 50 |
+|  | η | 0.0 |
+
+The training loop also includes:
+- random timestep sampling,
+- gradient clipping,
+- EMA model tracking,
+- checkpoint saving,
+- and logged training curves.
+
+---
+
+## What the Notebook Contains
+
+The notebook is written as a complete technical report rather than a raw experiment log. It includes:
+
+1. **Introduction and motivation**
+2. **Setup and configuration**
+3. **Model architecture**
+4. **Diffusion process and DDIM scheduler**
+5. **Loss function and training utilities**
+6. **Dataset and preprocessing**
+7. **Training procedure**
+8. **Quantitative evaluation**
+9. **Qualitative analysis and visualisation**
+10. **Discussion and limitations**
+11. **Conclusion**
+12. **Reproducibility notes and appendices**
+
+---
+
+## Qualitative Analysis Included
+
+The final notebook contains:
+
+- **class-conditional sample grids**
+- **reverse diffusion visualisation** from pure noise to final image
+- **DDIM step-count comparisons**
+- **guidance-scale ablations**
+- **stochasticity comparisons** across different `η` values
+- and a short discussion of **failure modes and limitations**
+
+---
+
+## Rubric Alignment
+
+| Rubric Area | Evidence in This Submission |
+|---|---|
+| **Implementation** | From-scratch U-Net, time embedding, class embedding, FiLM conditioning, self-attention, DDIM scheduler |
+| **Dataset & Preprocessing** | CIFAR-10 justification, `[-1, 1]` scaling, simple augmentation |
+| **Training & Quantitative Evaluation** | Training loop, random timestep sampling, MSE objective, FID, Inception Score |
+| **Analysis & Qualitative Visualisation** | Pure-noise sampling, reverse trajectory, sample grids, ablations |
+| **Report & Code Quality** | Structured notebook, modular code, reproducibility notes, clear explanations |
+
+---
+
+## How to Run
+
+### Environment
+- Python 3.10+
+- PyTorch
+- torchvision
+- matplotlib
+- tqdm
+- numpy
+- torch-fidelity
+
+### Install
+
 ```bash
 git clone https://github.com/AlirezaYegane/ddim-cfg-cifar10.git
 cd ddim-cfg-cifar10
 pip install torch torchvision matplotlib tqdm torch-fidelity numpy
 ```
- 
-### Run
- 
-**Full pipeline (train + evaluate + visualise):**
+
+### Main usage
+
 ```bash
-jupyter notebook report.ipynb
-# Run All Cells
-# If a checkpoint exists, training is skipped automatically
+jupyter notebook "2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.ipynb"
 ```
- 
-**Headless training:**
+
+Then run all cells in order.
+
+### Headless execution
+
 ```bash
-jupyter nbconvert --to script report.ipynb
-python report.py
+jupyter nbconvert --to script "2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.ipynb"
+python "2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.py"
 ```
- 
-**Resume from checkpoint:**
-```python
-checkpoint = torch.load('checkpoints/final_model.pt')
-model.load_state_dict(checkpoint['model_state_dict'])
-```
- 
-> Training takes ~9–10 hours from scratch on an RTX 6000 Ada. If `checkpoints/final_model.pt` exists, the notebook loads it and skips directly to evaluation.
- 
+
+### Checkpoints
+If a trained checkpoint already exists, the notebook loads it and skips expensive retraining steps where appropriate.
+
 ---
- 
-## Training Configuration
- 
-| Category | Parameter | Value |
-|---|---|---|
-| **Model** | Base channels | 128 |
-| | Channel multipliers | (1, 2, 4) → 128, 256, 512 |
-| | Attention resolutions | 16×16, 8×8 |
-| | Dropout | 0.1 |
-| **Diffusion** | Timesteps | 1000 |
-| | Schedule | Cosine |
-| | DDIM sampling steps | 50 |
-| | η | 0.0 (deterministic) |
-| **CFG** | Unconditional dropout | 10% |
-| | Guidance scale | 3.0 |
-| **Training** | Optimizer | AdamW (lr = 2e-4) |
-| | Batch size | 128 |
-| | Epochs | 400 |
-| | EMA decay | 0.9999 |
-| | Gradient clipping | max norm 1.0 |
-| | LR schedule | 1k-step warmup + cosine decay |
- 
+
+## Reproducibility Notes
+
+To make the project easier to reproduce:
+- all core hyperparameters are centralised in a single configuration dictionary,
+- the random seed is fixed,
+- the notebook contains the complete implementation in sequence,
+- and evaluation outputs are shown directly in the notebook.
+
+This means the notebook functions as both:
+- a **technical report**, and
+- a **self-contained implementation record**.
+
 ---
- 
-## What's in the Notebook
- 
-The notebook is self-contained — every component is implemented, trained, and evaluated in sequence:
- 
-1. **Implementation** — U-Net, DDIM scheduler, CFG sampling, MSE loss — all from scratch
-2. **Data pipeline** — CIFAR-10 with [-1, 1] normalisation + horizontal flip
-3. **Training** — 400 epochs with EMA, warmup, cosine LR, gradient clipping
-4. **Quantitative evaluation** — FID and Inception Score on 10k generated samples
-5. **Qualitative analysis:**
-   - 10×10 class-conditional sample grid
-   - Reverse diffusion visualisation (x_T → x_0)
-   - DDIM step-count comparison (10, 25, 50, 100, 200, 1000 steps)
-   - CFG guidance scale ablation (w = 0, 1, 3, 7.5, 15)
-   - Stochasticity comparison (η = 0 → 1)
- 
+
+## Limitations
+
+This project is intentionally scoped as a course assignment, so a few limitations remain:
+- CIFAR-10 is a low-resolution benchmark, so visual fidelity is naturally capped.
+- The training budget is much smaller than large published diffusion baselines.
+- Results are strong for a from-scratch student implementation, but not intended as a state-of-the-art claim.
+
+I have therefore focused on:
+- correct implementation,
+- clear explanation,
+- meaningful evaluation,
+- and honest analysis of trade-offs.
+
 ---
- 
+
+## Submission Files
+
+The main submission package consists of:
+- `2026S1 COMP8221 Assignment 1 60957107 Alireza Yegane.ipynb`
+- PDF export of the notebook
+- this `README.md`
+- repository source code and checkpoints as needed
+
+---
+
 ## References
- 
-```
+
+```bibtex
 @inproceedings{ho2020denoising,
   title     = {Denoising Diffusion Probabilistic Models},
   author    = {Ho, Jonathan and Jain, Ajay and Abbeel, Pieter},
   booktitle = {NeurIPS},
   year      = {2020}
 }
- 
+
 @inproceedings{song2021denoising,
   title     = {Denoising Diffusion Implicit Models},
   author    = {Song, Jiaming and Meng, Chenlin and Ermon, Stefano},
   booktitle = {ICLR},
   year      = {2021}
 }
- 
+
 @inproceedings{ho2021classifierfree,
   title     = {Classifier-Free Diffusion Guidance},
   author    = {Ho, Jonathan and Salimans, Tim},
   booktitle = {NeurIPS Workshop on Deep Generative Models},
   year      = {2021}
 }
- 
+
 @inproceedings{nichol2021improved,
   title     = {Improved Denoising Diffusion Probabilistic Models},
   author    = {Nichol, Alexander Quinn and Dhariwal, Prafulla},
@@ -195,11 +349,10 @@ The notebook is self-contained — every component is implemented, trained, and 
   year      = {2021}
 }
 ```
- 
+
 ---
- 
-<div align="center">
- 
-**COMP8221 · Advanced Machine Learning · 2026 S1**
- 
-</div>
+
+<p align="center">
+  <strong>Macquarie University</strong><br>
+  COMP8221 · Advanced Machine Learning · 2026 S1
+</p>
