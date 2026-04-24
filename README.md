@@ -1,19 +1,18 @@
 <p align="center">
-  <img src="assets/macquarie-university-logo.png" alt="Macquarie University" width="260">
+  <img src="logo/logo.png" alt="Macquarie University" width="220"/>
 </p>
 
 <h1 align="center">From-Scratch DDIM with Classifier-Free Guidance on CIFAR-10</h1>
 
 <p align="center">
-  <strong>COMP8221 — Advanced Machine Learning</strong><br>
+  <strong>COMP8221 — Advanced Machine Learning</strong><br/>
   <strong>Assignment 1 — Option 3: Diffusion Models</strong>
 </p>
 
 <p align="center">
-  A from-scratch PyTorch implementation of <strong>Denoising Diffusion Implicit Models (DDIM)</strong><br>
-  with <strong>Classifier-Free Guidance (CFG)</strong> for class-conditional image generation on <strong>CIFAR-10</strong>.
+  A from-scratch PyTorch implementation of Denoising Diffusion Implicit Models (DDIM)<br/>
+  with Classifier-Free Guidance (CFG) for class-conditional image generation on CIFAR-10.
 </p>
-
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue">
   <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-2.x-ee4c2c">
